@@ -1,0 +1,303 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pepsico-route-dispatch",
+        "responseMode": "responseNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -16
+      ],
+      "id": "67b0ddf3-ec3f-4d8d-8721-95bb862f5a4b",
+      "name": "Webhook",
+      "webhookId": "3125153a-3ba3-4550-86dd-78a91045ecc1",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "model": "openai.gpt-oss-120b-1:0",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAwsBedrock",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        208
+      ],
+      "id": "b5fb7a3b-5f76-46ad-8400-78722b648d20",
+      "name": "AWS Bedrock Chat Model",
+      "credentials": {
+        "aws": {
+          "id": "Qwn6WVEJTA0E5YvM",
+          "name": "AWS account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"status\": \"success\",\n  \"message\": \"Workflow executed successfully\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        544,
+        -16
+      ],
+      "id": "344fd016-1625-4e60-8b85-cfb3efb68b4f",
+      "name": "Respond to Webhook",
+      "notes": "Final webhook response to ServiceNow after all MCP calls."
+    },
+    {
+      "parameters": {
+        "endpointUrl": "http://34.197.44.143:8001/mcp",
+        "serverTransport": "httpStreamable",
+        "authentication": "bearerAuth",
+        "include": "selected",
+        "includeTools": [
+          "execute_route"
+        ],
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.1,
+      "position": [
+        272,
+        208
+      ],
+      "id": "212de08f-411c-4e27-ae2c-09f5e8e57b17",
+      "name": "Logistics MCP Client",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "m7mTadpwM27eT25m",
+          "name": "Bearer Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "endpointUrl": "http://34.197.44.143:8002/mcp ",
+        "serverTransport": "httpStreamable",
+        "authentication": "bearerAuth",
+        "include": "selected",
+        "includeTools": [
+          "notify_delivery_delay"
+        ],
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.1,
+      "position": [
+        432,
+        208
+      ],
+      "id": "ece86058-8a87-4961-8a02-d2497942ce5b",
+      "name": "Retail MCP Client",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "m7mTadpwM27eT25m",
+          "name": "Bearer Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "endpointUrl": "http://34.197.44.143:8000/mcp ",
+        "serverTransport": "httpStreamable",
+        "authentication": "bearerAuth",
+        "include": "selected",
+        "includeTools": [
+          "update_execution_status",
+          "get_route_data"
+        ],
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.1,
+      "position": [
+        608,
+        208
+      ],
+      "id": "d9ac8a7d-ea16-49bb-b099-c7318bf85092",
+      "name": "ServiceNow MCP Client",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "m7mTadpwM27eT25m",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Connect to Logistics MCP Client tool: execute_route – the payload is:\n{\n  \"route_id\": \"{{ $json.body.route_id }}\",\n  \"truck_id\": \"{{ $json.body.truck_id }}\",\n  \"chosen_option\": {\n    \"option_id\": \"{{ $json.body.chosen_option.option_id }}\",\n    \"route_number\": {{ $json.body.chosen_option.route_number }},\n    \"distance_miles\": {{ $json.body.chosen_option.distance_miles }},\n    \"eta_minutes\": {{ $json.body.chosen_option.eta_minutes }}\n  }\n}\nConnect to Retail MCP Client Tool: notify_delivery_delay – the payload is: {\n  \"route_id\": \"{{ $json.body.route_id }}\",\n  \"truck_id\": \"{{ $json.body.truck_id }}\",\n  \"chosen_option\": {\n    \"option_id\": \"{{ $json.body.chosen_option.option_id }}\",\n    \"route_number\": {{ $json.body.chosen_option.route_number }},\n    \"distance_miles\": {{ $json.body.chosen_option.distance_miles }},\n    \"eta_minutes\": {{ $json.body.chosen_option.eta_minutes }}\n  }\n}\nConnect to ServiceNow MCP Client Tool: update_execution_status – the payload is: {\n  \"route_id\": {{ $json.body.route_id }},\n  \"status\": dispatched\n  \"instance\": \"https://kura-labs-jul-4728-0009.lab.service-now.com\"\n}\n",
+        "options": {
+          "systemMessage": ""
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        -16
+      ],
+      "id": "f053b7e4-4b08-482f-a825-e23aba62304b",
+      "name": "AI Agent",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput",
+      "notes": "Coordinates routing data from ServiceNow with MCP clients for external dispatch."
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "pepsico.app.n8n.cloud",
+            "user-agent": "ServiceNow/1.0",
+            "content-length": "161",
+            "accept": "application/json",
+            "accept-encoding": "gzip, br",
+            "cdn-loop": "cloudflare; loops=1; subreqs=1",
+            "cf-connecting-ip": "4.223.224.92",
+            "cf-ew-via": "15",
+            "cf-ipcountry": "SE",
+            "cf-ray": "98b9d9988048eff0-ARN",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-worker": "n8n.cloud",
+            "content-type": "application/json",
+            "x-forwarded-for": "4.223.224.92, 104.23.221.167",
+            "x-forwarded-host": "pepsico.app.n8n.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "traefik-prod-users-gwc-43-869467f569-qvbjs",
+            "x-is-trusted": "yes",
+            "x-real-ip": "4.223.224.92",
+            "x-snc-integration-source": "498d1433c322a650d7299dcd2b013181"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "route_id": "368,357",
+            "truck_id": "2660",
+            "chosen_option": {
+              "option_id": "opt-2",
+              "route_number": 3,
+              "distance_miles": 140,
+              "eta_minutes": 90,
+              "calculated_impact": "$0.00"
+            }
+          },
+          "webhookUrl": "https://pepsico.app.n8n.cloud/webhook-test/pepsico-route-dispatch",
+          "executionMode": "test"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AWS Bedrock Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logistics MCP Client": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retail MCP Client": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ServiceNow MCP Client": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": -1
+  },
+  "versionId": "cdda5621-3ade-4d3c-b5bb-6f9f69daefb1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a21287a3092b200e315363b57b7a4df3cc9563e1ebc2c139ee86f290235f059b"
+  },
+  "id": "RtUE59RHAxBs67xS",
+  "tags": []
+}
