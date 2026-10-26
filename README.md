@@ -7,13 +7,7 @@ Delay Automation.
 **[View the complete project documentation](https://praneeth-97-pv.github.io/AMS_Project-/)**
 | [Open the HTML source](./index.html)
 
-## Care Agent Onboarding Portal
 
-The onboarding workflow receives agent data, imports and validates records,
-creates or updates user accounts, assigns roles and access, and handles
-approval, provisioning, notifications, and error paths.
-
-![Care Agent Onboarding Portal process flow](./assets/figure-01.png)
 
 ## Project workstreams
 
