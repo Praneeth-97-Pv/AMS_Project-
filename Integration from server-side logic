@@ -1,0 +1,9 @@
+#Integration from server-side logic
+
+var voyageService = new VoyageIntegrationService();
+
+var shipment = voyageService.getShipmentDetails('SHP12345');
+
+gs.info('Shipment: ' + shipment.shipmentId);
+gs.info('Status: ' + shipment.status);
+gs.info('ETA: ' + shipment.estimatedDelivery);
