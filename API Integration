@@ -1,4 +1,4 @@
-###Care Agent Onboarding Portal###
+//Care Agent Onboarding Portal
 (function process(request, response) {
 
     if (!gs.hasRole('x_demo.onboarding_integration')) {
@@ -82,7 +82,7 @@
 
 })(request, response);
 
-#Outbound API: ServiceNow to HR system
+//Outbound API: ServiceNow to HR system
 
 var HREmployeeIntegration = Class.create();
 
@@ -129,7 +129,7 @@ HREmployeeIntegration.prototype = {
     type: 'HREmployeeIntegration'
 };
 
-     ####  CATS Customer Appeals Tracking System ###
+//CATS Customer Appeals Tracking System 
 
 (function process(request, response) {
 
@@ -201,7 +201,7 @@ HREmployeeIntegration.prototype = {
 
 })(request, response);
 
-#Outbound API — CATS to Voyage
+// Outbound API — CATS to Voyage
 
 var VoyageShipmentService = Class.create();
 
@@ -253,8 +253,8 @@ VoyageShipmentService.prototype = {
 };
 
 
-          ####Delivery Delay Automation ###
-#Script Include — DeliveryImpactCalculator
+//Delivery Delay Automation 
+Script Include — DeliveryImpactCalculator
 
 var DeliveryImpactCalculator = Class.create();
 
@@ -383,7 +383,7 @@ DeliveryImpactCalculator.prototype = {
 
 })(request, response);
 
-#Outbound API
+// Outbound API
 
 var DeliveryStatusIntegration = Class.create();
 
@@ -442,7 +442,7 @@ DeliveryStatusIntegration.prototype = {
     type: 'DeliveryStatusIntegration'
 };
 
-#Receiving API on the Delivery instance
+// Receiving API on the Delivery instance
 
 (function process(request, response) {
 
