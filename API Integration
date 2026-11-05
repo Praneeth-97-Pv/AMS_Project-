@@ -1,5 +1,4 @@
-               ###Care Agent Onboarding Portal###
-
+###Care Agent Onboarding Portal###
 (function process(request, response) {
 
     if (!gs.hasRole('x_demo.onboarding_integration')) {
