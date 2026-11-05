@@ -1,0 +1,509 @@
+               ###Care Agent Onboarding Portal###
+
+(function process(request, response) {
+
+    if (!gs.hasRole('x_demo.onboarding_integration')) {
+        response.setStatus(403);
+        response.setBody({ error: 'Forbidden' });
+        return;
+    }
+
+    var data = request.body.data || {};
+    var employeeId = String(data.employee_id || '').trim();
+    var email = String(data.email || '').trim();
+
+    if (!employeeId || !email ||
+        !data.first_name || !data.last_name ||
+        !data.manager_id) {
+
+        response.setStatus(400);
+        response.setBody({
+            error: 'Required onboarding fields are missing'
+        });
+        return;
+    }
+
+    var existing = new GlideRecordSecure(
+        'x_demo_agent_onboarding'
+    );
+
+    existing.addQuery('u_employee_id', employeeId);
+    existing.setLimit(1);
+    existing.query();
+
+    if (existing.next()) {
+        response.setStatus(409);
+        response.setBody({
+            error: 'Onboarding request already exists',
+            request_id: existing.getUniqueValue()
+        });
+        return;
+    }
+
+    // Approved roles must be validated against a
+    // server-controlled role mapping.
+    if (data.requested_role !== 'care_agent') {
+        response.setStatus(400);
+        response.setBody({
+            error: 'Unsupported requested role'
+        });
+        return;
+    }
+
+    var agent = new GlideRecordSecure(
+        'x_demo_agent_onboarding'
+    );
+
+    agent.initialize();
+    agent.setValue('u_employee_id', employeeId);
+    agent.setValue('u_first_name', String(data.first_name));
+    agent.setValue('u_last_name', String(data.last_name));
+    agent.setValue('u_email', email);
+    agent.setValue('u_manager_id', String(data.manager_id));
+    agent.setValue('u_requested_role', 'care_agent');
+    agent.setValue('u_status', 'pending_approval');
+
+    var sysId = agent.insert();
+
+    if (!sysId) {
+        response.setStatus(500);
+        response.setBody({
+            error: 'Unable to create onboarding request'
+        });
+        return;
+    }
+
+    response.setStatus(201);
+    response.setBody({
+        request_id: String(sysId),
+        employee_id: employeeId,
+        status: 'pending_approval',
+        message: 'Onboarding request created'
+    });
+
+})(request, response);
+
+#Outbound API: ServiceNow to HR system
+
+var HREmployeeIntegration = Class.create();
+
+HREmployeeIntegration.prototype = {
+
+    initialize: function() {},
+
+    getEmployee: function(employeeId) {
+
+        if (!/^[A-Za-z0-9_-]+$/.test(String(employeeId))) {
+            throw new Error('Invalid employee ID');
+        }
+
+        var rest = new sn_ws.RESTMessageV2(
+            'HR Employee Integration',
+            'get'
+        );
+
+        rest.setStringParameterNoEscape(
+            'employee_id',
+            encodeURIComponent(String(employeeId))
+        );
+
+        rest.setHttpTimeout(15000);
+
+        var result = rest.execute();
+
+        if (result.getStatusCode() !== 200) {
+            throw new Error(
+                'HR API failed: HTTP ' + result.getStatusCode()
+            );
+        }
+
+        var employee = JSON.parse(result.getBody());
+
+        return {
+            employeeId: employee.employeeId,
+            active: employee.active === true,
+            department: employee.department,
+            managerId: employee.managerId
+        };
+    },
+
+    type: 'HREmployeeIntegration'
+};
+
+     ####  CATS Customer Appeals Tracking System ###
+
+(function process(request, response) {
+
+    if (!gs.hasRole('x_demo.cats_integration')) {
+        response.setStatus(403);
+        response.setBody({ error: 'Forbidden' });
+        return;
+    }
+
+    var data = request.body.data || {};
+
+    if (!data.external_case_id ||
+        !data.customer_id ||
+        !data.short_description) {
+
+        response.setStatus(400);
+        response.setBody({
+            error: 'Missing required case details'
+        });
+        return;
+    }
+
+    var externalId = String(data.external_case_id);
+
+    var existing = new GlideRecordSecure('x_demo_cats_case');
+    existing.addQuery('u_external_case_id', externalId);
+    existing.setLimit(1);
+    existing.query();
+
+    if (existing.next()) {
+        response.setStatus(200);
+        response.setBody({
+            case_id: existing.getUniqueValue(),
+            status: 'already_exists'
+        });
+        return;
+    }
+
+    var catsCase = new GlideRecordSecure('x_demo_cats_case');
+    catsCase.initialize();
+
+    catsCase.setValue('u_external_case_id', externalId);
+    catsCase.setValue('u_customer_id', String(data.customer_id));
+    catsCase.setValue('u_shipment_id',
+        String(data.shipment_id || ''));
+    catsCase.setValue('u_short_description',
+        String(data.short_description));
+    catsCase.setValue('u_description',
+        String(data.description || ''));
+    catsCase.setValue('u_priority', '2');
+    catsCase.setValue('u_state', 'new');
+
+    var caseId = catsCase.insert();
+
+    if (!caseId) {
+        response.setStatus(500);
+        response.setBody({
+            error: 'Case creation failed'
+        });
+        return;
+    }
+
+    response.setStatus(201);
+    response.setBody({
+        case_id: String(caseId),
+        external_case_id: externalId,
+        status: 'created'
+    });
+
+})(request, response);
+
+#Outbound API — CATS to Voyage
+
+var VoyageShipmentService = Class.create();
+
+VoyageShipmentService.prototype = {
+
+    initialize: function() {},
+
+    getShipment: function(shipmentId) {
+
+        if (!/^[A-Za-z0-9_-]+$/.test(String(shipmentId))) {
+            throw new Error('Invalid shipment ID');
+        }
+
+        var rest = new sn_ws.RESTMessageV2(
+            'Voyage Shipment API',
+            'get'
+        );
+
+        rest.setStringParameterNoEscape(
+            'shipment_id',
+            encodeURIComponent(String(shipmentId))
+        );
+
+        rest.setRequestHeader('Accept', 'application/json');
+        rest.setHttpTimeout(15000);
+
+        var result = rest.execute();
+
+        if (result.getStatusCode() !== 200) {
+            gs.error(
+                'Voyage API returned HTTP ' +
+                result.getStatusCode()
+            );
+
+            throw new Error('Unable to retrieve shipment');
+        }
+
+        var shipment = JSON.parse(result.getBody());
+
+        return {
+            shipmentId: shipment.shipmentId,
+            status: shipment.status,
+            eta: shipment.estimatedDelivery,
+            location: shipment.currentLocation
+        };
+    },
+
+    type: 'VoyageShipmentService'
+};
+
+
+          ####Delivery Delay Automation ###
+#Script Include — DeliveryImpactCalculator
+
+var DeliveryImpactCalculator = Class.create();
+
+DeliveryImpactCalculator.prototype = {
+
+    initialize: function() {},
+
+    calculate: function(eta, windowHours, rate) {
+
+        eta = Number(eta);
+        windowHours = Number(windowHours);
+        rate = Number(rate);
+
+        if (!isFinite(eta) ||
+            !isFinite(windowHours) ||
+            !isFinite(rate) ||
+            eta < 0 || windowHours < 0 || rate < 0) {
+
+            throw new Error('Invalid numeric inputs');
+        }
+
+        var allowedMinutes = windowHours * 60;
+        var delayedMinutes = Math.max(
+            0,
+            eta - allowedMinutes
+        );
+
+        var impact = Math.round(
+            delayedMinutes * rate * 100
+        ) / 100;
+
+        return {
+            delayed: delayedMinutes > 0,
+            delay_minutes: delayedMinutes,
+            calculated_impact: impact,
+            status: delayedMinutes > 0 ?
+                'delayed' : 'on_time'
+        };
+    },
+
+    type: 'DeliveryImpactCalculator'
+};
+
+#Scripted REST API
+
+(function process(request, response) {
+
+    if (!gs.hasRole('x_demo.route_integration')) {
+        response.setStatus(403);
+        response.setBody({ error: 'Forbidden' });
+        return;
+    }
+
+    var body = request.body.data || {};
+    var routeId = String(body.route_id || '');
+
+    if (!/^[A-Za-z0-9_-]+$/.test(routeId)) {
+        response.setStatus(400);
+        response.setBody({ error: 'Invalid route ID' });
+        return;
+    }
+
+    var calculation;
+
+    try {
+        var calculator = new DeliveryImpactCalculator();
+
+        calculation = calculator.calculate(
+            body.eta_minutes,
+            body.delivery_window_hours,
+            body.penalty_rate
+        );
+    } catch (ex) {
+        response.setStatus(400);
+        response.setBody({
+            error: 'Invalid delivery calculation data'
+        });
+        return;
+    }
+
+    var record = new GlideRecordSecure(
+        'x_demo_delivery_delay'
+    );
+
+    record.addQuery('u_route_id', routeId);
+    record.setLimit(1);
+    record.query();
+
+    var isNew = !record.next();
+
+    if (isNew) {
+        record.initialize();
+        record.setValue('u_route_id', routeId);
+    }
+
+    record.setValue('u_eta_minutes',
+        Number(body.eta_minutes));
+    record.setValue('u_delivery_window_hours',
+        Number(body.delivery_window_hours));
+    record.setValue('u_penalty_rate',
+        Number(body.penalty_rate));
+    record.setValue('u_delay_minutes',
+        calculation.delay_minutes);
+    record.setValue('u_calculated_impact',
+        calculation.calculated_impact);
+    record.setValue('u_status', calculation.status);
+
+    var sysId = isNew ? record.insert() : record.update();
+
+    if (!sysId) {
+        response.setStatus(500);
+        response.setBody({
+            error: 'Unable to save route calculation'
+        });
+        return;
+    }
+
+    response.setStatus(isNew ? 201 : 200);
+    response.setBody({
+        route_id: routeId,
+        delay_minutes: calculation.delay_minutes,
+        calculated_impact: calculation.calculated_impact,
+        status: calculation.status,
+        record_id: String(sysId)
+    });
+
+})(request, response);
+
+#Outbound API
+
+var DeliveryStatusIntegration = Class.create();
+
+DeliveryStatusIntegration.prototype = {
+
+    initialize: function() {},
+
+    updateStatus: function(routeId, status) {
+
+        if (!/^[A-Za-z0-9_-]+$/.test(String(routeId))) {
+            throw new Error('Invalid route ID');
+        }
+
+        var allowed = {
+            dispatched: true,
+            delayed: true,
+            on_time: true
+        };
+
+        if (!allowed[status]) {
+            throw new Error('Invalid delivery status');
+        }
+
+        var rest = new sn_ws.RESTMessageV2(
+            'Delivery Instance Integration',
+            'patch'
+        );
+
+        rest.setRequestHeader(
+            'Content-Type',
+            'application/json'
+        );
+
+        rest.setRequestBody(JSON.stringify({
+            route_id: String(routeId),
+            status: status
+        }));
+
+        rest.setHttpTimeout(15000);
+
+        var result = rest.execute();
+        var httpStatus = result.getStatusCode();
+
+        if (httpStatus !== 200) {
+            gs.error(
+                'Delivery status update failed: HTTP ' +
+                httpStatus
+            );
+
+            throw new Error('Delivery synchronization failed');
+        }
+
+        return JSON.parse(result.getBody());
+    },
+
+    type: 'DeliveryStatusIntegration'
+};
+
+#Receiving API on the Delivery instance
+
+(function process(request, response) {
+
+    if (!gs.hasRole('x_demo.delivery_integration')) {
+        response.setStatus(403);
+        response.setBody({ error: 'Forbidden' });
+        return;
+    }
+
+    var body = request.body.data || {};
+    var routeId = String(body.route_id || '');
+    var status = String(body.status || '');
+
+    var allowed = {
+        dispatched: true,
+        delayed: true,
+        on_time: true
+    };
+
+    if (!/^[A-Za-z0-9_-]+$/.test(routeId) ||
+        !allowed[status]) {
+        response.setStatus(400);
+        response.setBody({
+            error: 'Invalid route or status'
+        });
+        return;
+    }
+
+    var delivery = new GlideRecordSecure(
+        'x_demo_delivery_delay'
+    );
+
+    delivery.addQuery('u_route_id', routeId);
+    delivery.setLimit(1);
+    delivery.query();
+
+    if (!delivery.next()) {
+        response.setStatus(404);
+        response.setBody({
+            error: 'Route not found'
+        });
+        return;
+    }
+
+    // Check approved transitions in production.
+    delivery.setValue('u_status', status);
+
+    if (!delivery.update()) {
+        response.setStatus(500);
+        response.setBody({
+            error: 'Status update failed'
+        });
+        return;
+    }
+
+    response.setStatus(200);
+    response.setBody({
+        route_id: routeId,
+        status: status,
+        synchronized: true
+    });
+
+})(request, response);
