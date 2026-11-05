@@ -1,4 +1,4 @@
-// Integration from server-side logic
+//  Integration from server-side logic
 
 var voyageService = new VoyageIntegrationService();
 
