@@ -298,7 +298,7 @@ DeliveryImpactCalculator.prototype = {
     type: 'DeliveryImpactCalculator'
 };
 
-#Scripted REST API
+// Scripted REST API
 
 (function process(request, response) {
 
