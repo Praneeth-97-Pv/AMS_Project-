@@ -1,8 +1,5 @@
-
-"use strict";
-
 // =====================================================
-// SERVICE NOW INTEGRATION - NODE.JS TEST VERSION
+// SERVICE NOW INTEGRATION 
 // =====================================================
 
 // Mock database - data exists only while program runs
